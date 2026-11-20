@@ -1,0 +1,65 @@
+# ==============================================================================
+# INDUSTRIAL PREDICTIVE MAINTENANCE CONFIGURATION (NASA CMAPSS - FD001)
+# ==============================================================================
+
+data:
+  dataset_id: "FD001"
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  # 80% de los motores para entrenar, 20% para validar (sin mezclar ciclos de un mismo motor)
+  train_split_ratio: 0.8
+  random_seed: 42
+
+physics_and_sensors:
+  # Piecewise RUL: durante los primeros ciclos el desgaste es imperceptible.
+  # Recortamos el RUL máximo a 125 ciclos para no meter ruido al modelo.
+  rul_cap: 125
+
+  # Nombres físicos reales de los 21 sensores del turbofán NASA CMAPSS
+  sensor_names:
+    s1: "T2_fan_inlet_temp"
+    s2: "T24_lpc_outlet_temp"
+    s3: "T30_hpc_outlet_temp"
+    s4: "T50_lpt_outlet_temp"
+    s5: "P2_fan_inlet_pressure"
+    s6: "P15_bypass_duct_pressure"
+    s7: "P30_hpc_outlet_pressure"
+    s8: "Nf_physical_fan_speed"
+    s9: "Nc_physical_core_speed"
+    s10: "epr_engine_pressure_ratio"
+    s11: "Ps30_hpc_static_pressure"
+    s12: "phi_fuel_flow_ratio"
+    s13: "NRf_corrected_fan_speed"
+    s14: "NRc_corrected_core_speed"
+    s15: "BPR_bypass_ratio"
+    s16: "farB_burner_fuel_air_ratio"
+    s17: "htBleed_bleed_enthalpy"
+    s18: "Nf_dmd_demanded_fan_speed"
+    s19: "PCNfR_dmd_demanded_corrected_fan_speed"
+    s20: "W31_hpt_coolant_bleed"
+    s21: "W32_lpt_coolant_bleed"
+
+  # Umbral mínimo de desviación estándar: si un sensor varía menos que esto,
+  # está congelado/muerto en este régimen operativo y se descarta automáticamente.
+  min_sensor_std: 0.001
+
+features:
+  # Ventanas móviles mirando SIEMPRE hacia atrás (evita data leakage)
+  rolling_windows: [5, 15]
+  ewma_span: 10
+  # Longitud de la secuencia temporal para la red neuronal LSTM en PyTorch
+  sequence_length: 30
+
+alarms_and_hysteresis:
+  # Umbrales operativos de mantenimiento (en ciclos restantes)
+  warning_threshold: 50
+  critical_threshold: 25
+  # Histéresis: cuántos ciclos consecutivos debe mantenerse la condición para disparar alarma
+  # (Evita parpadeos y fatiga de alarmas en sala de control)
+  warning_consecutive_cycles: 3
+  critical_consecutive_cycles: 2
+
+cost_asymmetry:
+  # En planta, predecir tarde (riesgo de rotura) cuesta mucho más que predecir pronto
+  late_prediction_penalty: 2.0
+  early_prediction_penalty: 1.0
